@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="fr" class="dark scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Card Craft Studio - Créateur de Cartes Pro & Événements</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- html2canvas & jsPDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        slate: {
+                            850: '#151e2e',
+                            950: '#070d18',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Cinzel:wght@600;800&family=Space+Grotesk:wght@500;700&display=swap');
+
+        body {
+            font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+            background-color: #070d18;
+            color: #f1f5f9;
+        }
+
+        /* 
+         * CRITICAL FIX FOR HTML2CANVAS TEXT CLIPPING & FONT METRICS:
+         * Standardized fixed dimension box, strict vertical line-heights, 
+         * line padding, and standard font stack to prevent cutoffs.
+         */
+        .card-export-node {
+            width: 480px;
+            height: 275px;
+            box-sizing: border-box;
+            position: relative;
+            flex-shrink: 0;
+            /* Standard safe font stack for canvas rasterization */
+            font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+            -webkit-font-smoothing: antialiased;
+            text-rendering: optimizeLegibility;
+            line-height: 1.35;
+        }
+
+        /* Prevent clipping on text elements */
+        .card-export-node *, .card-export-node p, .card-export-node h1, .card-export-node h2, .card-export-node span {
+            overflow: visible !important;
+            text-overflow: clip !important;
+            white-space: normal;
+        }
+
+        /* Vertical Badge Dimensions */
+        .card-export-node.vertical {
+            width: 280px;
+            height: 440px;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+
+        /* Subtle Glow effects */
+        .glow-indigo {
+            box-shadow: 0 0 25px -5px rgba(99, 102, 241, 0.3);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between antialiased">
+
+    <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-50 shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-emerald-500 flex items-center justify-center text-white shadow-md">
+                    <i class="fa-solid fa-wand-magic-sparkles text-lg"></i>
+                </div>
+                <div>
+                    <span class="font-extrabold text-lg text-white tracking-tight flex items-center gap-2">
+                        Card Craft <span class="text-xs px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 font-semibold">Studio Pro</span>
+                    </span>
+                    <p class="text-xs text-slate-400 hidden sm:block">Concevez & Exportez des Cartes Haute Définition</p>
+                </div>
+            </div>
+
+            <!-- Tabs Navigation -->
+            <nav class="flex bg-slate-800/80 p-1 rounded-xl border border-slate-700/60">
+                <button id="tab-studio-btn" onclick="switchTab('studio')" class="px-4 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center space-x-2 bg-indigo-600 text-white shadow">
+                    <i class="fa-solid fa-pen-ruler"></i>
+                    <span>Studio</span>
+                </button>
+                <button id="tab-galerie-btn" onclick="switchTab('galerie')" class="px-4 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition-all flex items-center space-x-2">
+                    <i class="fa-solid fa-border-all"></i>
+                    <span>Galerie & Modèles</span>
+                </button>
+            </nav>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+        
+        <!-- ================= STUDIO TAB ================= -->
+        <div id="view-studio" class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            
+            <!-- LEFT PANEL: Controls & Form (lg:col-span-5) -->
+            <div class="lg:col-span-5 space-y-6 order-2 lg:order-1">
+                
+                <!-- Category Selector -->
+                <div class="bg-slate-850 border border-slate-800 rounded-2xl p-5 shadow-xl">
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Type de Carte</label>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2" id="categoryPills">
+                        <!-- Rendered by JS -->
+                    </div>
+                </div>
+
+                <!-- Dynamic Form Inputs -->
+                <div class="bg-slate-850 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <h2 class="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                            <i class="fa-solid fa-sliders text-indigo-400"></i>
+                            <span>Contenu de la carte</span>
+                        </h2>
+                        <span id="categoryBadge" class="text-xs px-2.5 py-1 rounded-md bg-slate-800 text-slate-300 border border-slate-700 font-medium">Pro</span>
+                    </div>
+
+                    <div id="dynamicFormFields" class="space-y-4">
+                        <!-- Rendered dynamically depending on category -->
+                    </div>
+                </div>
+
+                <!-- Theme & Image Upload -->
+                <div class="bg-slate-850 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-5">
+                    <h2 class="text-sm font-bold text-white uppercase tracking-wider border-b border-slate-800 pb-3 flex items-center gap-2">
+                        <i class="fa-solid fa-palette text-emerald-400"></i>
+                        <span>Personnalisation Visuelle</span>
+                    </h2>
+
+                    <!-- Colors -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 uppercase mb-2">Thème de Couleur</label>
+                        <div class="flex flex-wrap gap-2.5" id="colorThemePicker">
+                            <!-- Rendered by JS -->
+                        </div>
+                    </div>
+
+                    <!-- Image / Logo Upload -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 uppercase mb-2">Logo / Photo / Avatar</label>
+                        <div class="flex items-center space-x-3">
+                            <label class="cursor-pointer bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-4 py-2.5 rounded-xl text-xs font-semibold transition flex items-center space-x-2">
+                                <i class="fa-solid fa-cloud-arrow-up text-indigo-400"></i>
+                                <span>Importer une image</span>
+                                <input type="file" id="imageInput" accept="image/*" onchange="handleImageUpload(event)" class="hidden">
+                            </label>
+                            <button id="btnRemoveImage" onclick="removeImage()" class="hidden px-3 py-2.5 bg-rose-500/10 text-rose-400 border border-rose-500/20 hover:bg-rose-500/20 rounded-xl text-xs font-semibold transition">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- RIGHT PANEL: Live Card Canvas Preview & Exports (lg:col-span-7) -->
+            <div class="lg:col-span-7 space-y-6 order-1 lg:order-2 sticky top-20">
+                
+                <div class="bg-slate-850 border border-slate-800 rounded-2xl p-6 shadow-2xl flex flex-col items-center justify-center min-h-[420px] relative">
+                    
+                    <div class="w-full flex items-center justify-between mb-4 px-2">
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                            Aperçu Haute Fidélité
+                        </span>
+                        <span class="text-xs text-slate-500 font-mono" id="dimensionsLabel">480 x 275 px (Impression 300DPI)</span>
+                    </div>
+
+                    <!-- Scrollable viewport wrapper for small screen safety -->
+                    <div class="w-full overflow-x-auto py-4 flex items-center justify-center preview-scroll">
+                        <!-- Canvas DOM capture target -->
+                        <div id="cardCanvas" class="card-export-node rounded-2xl shadow-2xl transition-all duration-300">
+                            <!-- Injected by JavaScript -->
+                        </div>
+                    </div>
+
+                    <p class="text-xs text-slate-500 mt-2 text-center">
+                        <i class="fa-solid fa-circle-info mr-1"></i>
+                        Les textes et polices sont optimisés pour éviter tout tronquage lors de l'impression.
+                    </p>
+                </div>
+
+                <!-- Export Action Buttons -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <button onclick="downloadPNG()" class="flex items-center justify-center space-x-2 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg transition transform active:scale-95">
+                        <i class="fa-solid fa-file-image"></i>
+                        <span>Télécharger PNG</span>
+                    </button>
+                    
+                    <button onclick="downloadPDF()" class="flex items-center justify-center space-x-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg transition transform active:scale-95">
+                        <i class="fa-solid fa-file-pdf text-rose-400"></i>
+                        <span>Format PDF (85.6x54mm)</span>
+                    </button>
+
+                    <button onclick="saveToGallery()" class="flex items-center justify-center space-x-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 font-bold py-3.5 px-4 rounded-xl shadow-lg transition transform active:scale-95">
+                        <i class="fa-solid fa-bookmark"></i>
+                        <span>Sauvegarder</span>
+                    </button>
+                </div>
+
+            </div>
+
+        </div>
+
+        <!-- ================= GALERIE TAB ================= -->
+        <div id="view-galerie" class="hidden space-y-8">
+            
+            <div>
+                <h2 class="text-2xl font-extrabold text-white tracking-tight">Galerie & Modèles Prédéfinis</h2>
+                <p class="text-sm text-slate-400 mt-1">Choisissez un modèle prêt à l'emploi ou retrouvez vos créations sauvegardées.</p>
+            </div>
+
+            <!-- Presets Section -->
+            <div class="space-y-4">
+                <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                    <i class="fa-solid fa-sparkles text-amber-400"></i>
+                    <span>Modèles de Démonstration</span>
+                </h3>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="presetsGrid">
+                    <!-- Injected by JS -->
+                </div>
+            </div>
+
+            <hr class="border-slate-800">
+
+            <!-- Saved Cards Section -->
+            <div class="space-y-4">
+                <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                    <i class="fa-solid fa-folder-open text-indigo-400"></i>
+                    <span>Vos Créations Sauvegardées</span>
+                </h3>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="savedCardsGrid">
+                    <!-- Injected by JS -->
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Toast Notification Overlay -->
+    <div id="toast" class="fixed bottom-6 right-6 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
+        <div class="bg-slate-800 text-white border border-slate-700 px-4 py-3 rounded-xl shadow-2xl flex items-center space-x-3">
+            <div id="toastIcon" class="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                <i class="fa-solid fa-check"></i>
+            </div>
+            <div>
+                <p id="toastTitle" class="text-xs font-bold text-white">Notification</p>
+                <p id="toastMessage" class="text-xs text-slate-300">Message système</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-800/80 bg-slate-950 py-6 text-center text-xs text-slate-500">
+        <p>© 2026 Card Craft Studio — Rendu Vectoriel HD & Export Impression Garantie sans rognage.</p>
+    </footer>
+
+    <script>
+        /* 
+         * Application State Management
+         */
+        const categories = {
+            pro: {
+                id: 'pro',
+                label: 'Carte Pro',
+                icon: 'fa-briefcase',
+                vertical: false,
+                fields: [
+                    { id: 'name', label: 'Nom & Prénom', type: 'text', default: 'Sophie Laurent' },
+                    { id: 'title', label: 'Fonction / Poste', type: 'text', default: 'Directrice Marketing' },
+                    { id: 'company', label: 'Entreprise', type: 'text', default: 'NEXUS INNOVATION' },
+                    { id: 'email', label: 'Email Pro', type: 'email', default: 's.laurent@nexus-innov.fr' },
+                    { id: 'phone', label: 'Téléphone', type: 'text', default: '+33 6 45 78 90 12' },
+                    { id: 'web', label: 'Site Web / Adresse', type: 'text', default: 'www.nexus-innovation.fr' }
+                ]
+            },
+            badge: {
+                id: 'badge',
+                label: 'ID Badge',
+                icon: 'fa-id-badge',
+                vertical: true,
+                fields: [
+                    { id: 'name', label: 'Nom Complet', type: 'text', default: 'Alexandre Dubois' },
+                    { id: 'role', label: 'Poste / Rôle', type: 'text', default: 'Développeur Lead' },
+                    { id: 'dept', label: 'Département', type: 'text', default: 'R&D Digitale' },
+                    { id: 'matricule', label: 'Matricule / ID', type: 'text', default: 'ID-88402-NX' },
+                    { id: 'expiry', label: 'Expiration', type: 'text', default: '12 / 2028' }
+                ]
+            },
+            birthday: {
+                id: 'birthday',
+                label: 'Anniversaire',
+                icon: 'fa-cake-candles',
+                vertical: false,
+                fields: [
+                    { id: 'name', label: 'Prénom du Fêté', type: 'text', default: 'Camille' },
+                    { id: 'age', label: 'Âge fêté', type: 'text', default: '30 Ans' },
+                    { id: 'message', label: 'Message Invitation', type: 'text', default: 'Viens fêter mon anniversaire pour une soirée inoubliable !' },
+                    { id: 'date', label: 'Date & Heure', type: 'text', default: 'Samedi 18 Octobre - 20h00' },
+                    { id: 'location', label: 'Lieu / Adresse', type: 'text', default: 'Le Loft Rooftop, Paris 11ème' }
+                ]
+            },
+            event: {
+                id: 'event',
+                label: 'Invitation',
+                icon: 'fa-envelope-open-text',
+                vertical: false,
+                fields: [
+                    { id: 'eventTitle', label: "Titre de l'événement", type: 'text', default: 'GALA DE CHARITÉ 2026' },
+                    { id: 'host', label: 'Hôte / Organisateur', type: 'text', default: 'Fondation Horizon Tech' },
+                    { id: 'date', label: 'Date & Horaires', type: 'text', default: '15 Novembre 2026 • 19h30' },
+                    { id: 'location', label: 'Lieu de Réception', type: 'text', default: 'Grand Palais, Salon d\'Honneur' },
+                    { id: 'passCode', label: 'Code Pass VIP', type: 'text', default: 'PASS-VIP-9901' }
+                ]
+            },
+            vip: {
+                id: 'vip',
+                label: 'Carte Membre VIP',
+                icon: 'fa-crown',
+                vertical: false,
+                fields: [
+                    { id: 'name', label: 'Nom du Membre', type: 'text', default: 'M. Jean-Luc Moreau' },
+                    { id: 'memberNo', label: 'Numéro de Membre', type: 'text', default: 'VIP 004 882 10' },
+                    { id: 'tier', label: 'Niveau VIP', type: 'text', default: 'PLATINUM CLUB' },
+                    { id: 'validity', label: 'Valide Jusqu\'à', type: 'text', default: '31/12/2027' }
+                ]
+            }
+        };
+
+        const colorThemes = {
+            indigo: { name: 'Indigo', main: '#4f46e5', gradientBg: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)', textPrimary: '#ffffff', textSecondary: '#a5b4fc', accent: '#6366f1' },
+            emerald: { name: 'Émeraude', main: '#059669', gradientBg: 'linear-gradient(135deg, #022c22 0%, #064e3b 100%)', textPrimary: '#ffffff', textSecondary: '#6ee7b7', accent: '#10b981' },
+            amber: { name: 'Ambre', main: '#d97706', gradientBg: 'linear-gradient(135deg, #451a03 0%, #78350f 100%)', textPrimary: '#ffffff', textSecondary: '#fcd34d', accent: '#f59e0b' },
+            rose: { name: 'Rose', main: '#e11d48', gradientBg: 'linear-gradient(135deg, #4c0519 0%, #881337 100%)', textPrimary: '#ffffff', textSecondary: '#fda4af', accent: '#f43f5e' },
+            cyan: { name: 'Cyan', main: '#0891b2', gradientBg: 'linear-gradient(135deg, #083344 0%, #164e63 100%)', textPrimary: '#ffffff', textSecondary: '#67e8f9', accent: '#06b6d4' },
+            darkgold: { name: 'Or Luxe', main: '#eab308', gradientBg: 'linear-gradient(135deg, #18181b 0%, #27272a 100%)', textPrimary: '#fef08a', textSecondary: '#d4d4d8', accent: '#eab308' }
+        };
+
+        let currentCategory = 'pro';
+        let currentTheme = 'indigo';
+        let currentImageSrc = '';
+        let formData = {};
+
+        // Saved user cards
+        let savedCards = JSON.parse(localStorage.getItem('card_craft_saved_cards') || '[]');
+
+        window.addEventListener('DOMContentLoaded', () => {
+            initCategoryPills();
+            initColorPicker();
+            loadCategoryData(currentCategory);
+            renderPresets();
+            renderSavedCards();
+        });
+
+        function switchTab(tab) {
+            const studioView = document.getElementById('view-studio');
+            const galerieView = document.getElementById('view-galerie');
+            const btnStudio = document.getElementById('tab-studio-btn');
+            const btnGalerie = document.getElementById('tab-galerie-btn');
+
+            if (tab === 'studio') {
+                studioView.classList.remove('hidden');
+                galerieView.classList.add('hidden');
+                btnStudio.className = "px-4 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center space-x-2 bg-indigo-600 text-white shadow";
+                btnGalerie.className = "px-4 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition-all flex items-center space-x-2";
+            } else {
+                studioView.classList.add('hidden');
+                galerieView.classList.remove('hidden');
+                btnGalerie.className = "px-4 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center space-x-2 bg-indigo-600 text-white shadow";
+                btnStudio.className = "px-4 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition-all flex items-center space-x-2";
+            }
+        }
+
+        function initCategoryPills() {
+            const container = document.getElementById('categoryPills');
+            container.innerHTML = Object.values(categories).map(cat => `
+                <button onclick="setCategory('${cat.id}')" id="cat-btn-${cat.id}" class="px-3 py-2.5 rounded-xl border text-xs font-bold transition flex items-center justify-center space-x-2 ${cat.id === currentCategory ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg' : 'bg-slate-800/80 border-slate-700/80 text-slate-400 hover:bg-slate-700 hover:text-white'}">
+                    <i class="fa-solid ${cat.icon}"></i>
+                    <span>${cat.label}</span>
+                </button>
+            `).join('');
+        }
+
+        function initColorPicker() {
+            const container = document.getElementById('colorThemePicker');
+            container.innerHTML = Object.entries(colorThemes).map(([key, t]) => `
+                <button onclick="setTheme('${key}')" id="theme-btn-${key}" class="w-8 h-8 rounded-full border-2 transition-transform transform hover:scale-110 flex items-center justify-center shadow" style="background: ${t.main}; border-color: ${key === currentTheme ? '#ffffff' : 'transparent'};" title="${t.name}">
+                </button>
+            `).join('');
+        }
+
+        function setCategory(catId) {
+            currentCategory = catId;
+            initCategoryPills();
+            loadCategoryData(catId);
+            showToast("Catégorie changée", `Modèle ${categories[catId].label} chargé.`);
+        }
+
+        function setTheme(themeKey) {
+            currentTheme = themeKey;
+            initColorPicker();
+            renderCard();
+        }
+
+        function loadCategoryData(catId) {
+            const cat = categories[catId];
+            document.getElementById('categoryBadge').innerText = cat.label;
+
+            // Pre-fill formData
+            formData = {};
+            cat.fields.forEach(field => {
+                formData[field.id] = field.default;
+            });
+
+            // Update Dimensions label
+            const dimensionsLabel = document.getElementById('dimensionsLabel');
+            const cardCanvas = document.getElementById('cardCanvas');
+            if (cat.vertical) {
+                dimensionsLabel.innerText = "280 x 440 px (ID Badge Vertical)";
+                cardCanvas.classList.add('vertical');
+            } else {
+                dimensionsLabel.innerText = "480 x 275 px (Format Standard)";
+                cardCanvas.classList.remove('vertical');
+            }
+
+            renderDynamicForm();
+            renderCard();
+        }
+
+        function renderDynamicForm() {
+            const container = document.getElementById('dynamicFormFields');
+            const cat = categories[currentCategory];
+
+            container.innerHTML = cat.fields.map(f => `
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 uppercase mb-1.5">${f.label}</label>
+                    <input type="${f.type}" value="${formData[f.id] || ''}" oninput="updateFormField('${f.id}', this.value)" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition">
+                </div>
+            `).join('');
+        }
+
+        function updateFormField(key, val) {
+            formData[key] = val;
+            renderCard();
+        }
+
+        function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    currentImageSrc = e.target.result;
+                    document.getElementById('btnRemoveImage').classList.remove('hidden');
+                    renderCard();
+                    showToast("Image ajoutée", "Aperçu mis à jour.");
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function removeImage() {
+            currentImageSrc = '';
+            document.getElementById('imageInput').value = '';
+            document.getElementById('btnRemoveImage').classList.add('hidden');
+            renderCard();
+        }
+
+        function renderCard() {
+            const canvas = document.getElementById('cardCanvas');
+            const t = colorThemes[currentTheme];
+            const cat = categories[currentCategory];
+
+            // Common Avatar element fallback
+            const avatarHTML = currentImageSrc 
+                ? `<img src="${currentImageSrc}" style="width: 58px; height: 58px; border-radius: 12px; object-fit: cover; border: 2px solid ${t.accent}; display: block;" crossorigin="anonymous"/>`
+                : `<div style="width: 58px; height: 58px; border-radius: 12px; background: rgba(255,255,255,0.1); border: 2px dashed ${t.accent}; display: flex; align-items: center; justify-content: center; color: ${t.textSecondary};"><i class="fa-solid fa-user text-xl"></i></div>`;
+
+            let templateHTML = '';
+
+            // Render specific category design layout with explicit padding and vertical height fixes
+            switch(currentCategory) {
+                case 'pro':
+                    templateHTML = `
+                        <div style="width: 100%; height: 100%; background: ${t.gradientBg}; color: ${t.textPrimary}; padding: 24px; display: flex; flex-direction: column; justify-content: space-between; border-radius: 16px; border: 1px solid rgba(255,255,255,0.1); box-sizing: border-box; overflow: hidden; position: relative;">
+                            
+                            <!-- Header -->
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start; z-index: 2;">
+                                <div>
+                                    <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; tracking: 2px; color: ${t.textSecondary}; padding-bottom: 2px;">
+                                        ${formData.company || 'ENTREPRISE'}
+                                    </div>
+                                </div>
+                                ${avatarHTML}
+                            </div>
+
+                            <!-- Body -->
+                            <div style="z-index: 2; padding-top: 4px; padding-bottom: 4px;">
+                                <div style="font-size: 22px; font-weight: 800; color: ${t.textPrimary}; padding-bottom: 2px; line-height: 1.2;">
+                                    ${formData.name || 'Nom & Prénom'}
+                                </div>
+                                <div style="font-size: 12px; font-weight: 600; color: ${t.textSecondary}; text-transform: uppercase; letter-spacing: 1px;">
+                                    ${formData.title || 'Poste'}
+                                </div>
+                            </div>
+
+                            <!-- Footer Grid -->
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 10.5px; color: ${t.textPrimary}; z-index: 2; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.15);">
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <span style="color: ${t.accent};"><i class="fa-solid fa-phone"></i></span>
+                                    <span>${formData.phone || ''}</span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <span style="color: ${t.accent};"><i class="fa-solid fa-envelope"></i></span>
+                                    <span>${formData.email || ''}</span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 6px; grid-column: span 2;">
+                                    <span style="color: ${t.accent};"><i class="fa-solid fa-globe"></i></span>
+                                    <span>${formData.web || ''}</span>
+                                </div>
+                            </div>
+
+                            <!-- Background Accent Shape -->
+                            <div style="position: absolute; right: -40px; bottom: -40px; width: 160px; height: 160px; border-radius: 50%; background: ${t.main}; opacity: 0.15; pointer-events: none;"></div>
+                        </div>
+                    `;
+                    break;
+
+                case 'badge':
+                    templateHTML = `
+                        <div style="width: 100%; height: 100%; background: ${t.gradientBg}; color: ${t.textPrimary}; padding: 20px; display: flex; flex-direction: column; justify-content: space-between; align-items: center; text-align: center; border-radius: 16px; border: 1px solid rgba(255,255,255,0.15); box-sizing: border-box; position: relative;">
+                            
+                            <!-- Badge Slot -->
+                            <div style="width: 36px; height: 8px; background: rgba(255,255,255,0.2); border-radius: 4px; margin-bottom: 8px;"></div>
+
+                            <div style="font-size: 10px; font-weight: 800; tracking: 2px; text-transform: uppercase; color: ${t.textSecondary};">
+                                ACCESS BADGE VIP
+                            </div>
+
+                            <!-- Avatar -->
+                            <div style="margin: 8px 0;">
+                                ${currentImageSrc ? 
+                                    `<img src="${currentImageSrc}" style="width: 90px; height: 90px; border-radius: 50%; object-fit: cover; border: 3px solid ${t.accent};" crossorigin="anonymous"/>` :
+                                    `<div style="width: 80px; height: 80px; border-radius: 50%; background: rgba(255,255,255,0.1); border: 2px dashed ${t.accent}; display: flex; align-items: center; justify-content: center; margin: 0 auto; color: ${t.textSecondary};"><i class="fa-solid fa-user-astronaut text-3xl"></i></div>`
+                                }
+                            </div>
+
+                            <!-- Name & Role -->
+                            <div>
+                                <div style="font-size: 18px; font-weight: 800; color: ${t.textPrimary}; padding-bottom: 2px;">${formData.name || 'Nom'}</div>
+                                <div style="font-size: 12px; font-weight: 600; color: ${t.textSecondary};">${formData.role || 'Role'}</div>
+                            </div>
+
+                            <!-- Info Box -->
+                            <div style="width: 100%; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 10px; font-size: 10px; text-align: left; display: grid; grid-template-cols: 1fr 1fr; gap: 4px;">
+                                <div><span style="color:${t.textSecondary}">DÉPT:</span> ${formData.dept || '—'}</div>
+                                <div><span style="color:${t.textSecondary}">EXP:</span> ${formData.expiry || '—'}</div>
+                                <div style="grid-column: span 2; font-family: monospace; letter-spacing: 1px; margin-top: 4px; color:${t.accent}; font-weight: 700;">
+                                    ${formData.matricule || 'ID-0000'}
+                                </div>
+                            </div>
+
+                            <!-- Barcode graphic simulation -->
+                            <div style="width: 100%; height: 20px; background: repeating-linear-gradient(90deg, #fff, #fff 2px, transparent 2px, transparent 4px); opacity: 0.7; margin-top: 4px;"></div>
+                        </div>
+                    `;
+                    break;
+
+                case 'birthday':
+                    templateHTML = `
+                        <div style="width: 100%; height: 100%; background: ${t.gradientBg}; color: ${t.textPrimary}; padding: 24px; display: flex; flex-direction: column; justify-content: space-between; border-radius: 16px; border: 2px solid ${t.accent}; box-sizing: border-box; position: relative;">
+                            
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; color: ${t.textSecondary};">
+                                    <i class="fa-solid fa-cake-candles mr-1"></i> CELEBRATION
+                                </div>
+                                <div style="font-size: 16px; font-weight: 800; background: ${t.accent}; color: #fff; padding: 2px 10px; border-radius: 20px;">
+                                    ${formData.age || '30 Ans'}
+                                </div>
+                            </div>
+
+                            <div style="padding: 8px 0;">
+                                <div style="font-size: 10px; text-transform: uppercase; color: ${t.textSecondary}; font-weight: 700;">Invitation spéciale pour</div>
+                                <div style="font-size: 26px; font-weight: 800; color: ${t.textPrimary}; font-family: 'Cinzel', serif;">
+                                    ${formData.name || 'Prénom'}
+                                </div>
+                                <div style="font-size: 11px; font-style: italic; color: ${t.textSecondary}; margin-top: 4px;">
+                                    "${formData.message || ''}"
+                                </div>
+                            </div>
+
+                            <div style="background: rgba(255,255,255,0.08); padding: 10px 14px; border-radius: 12px; font-size: 11px; display: flex; justify-content: space-between; align-items: center;">
+                                <div><i class="fa-regular fa-calendar-check mr-1.5" style="color:${t.accent}"></i> ${formData.date || ''}</div>
+                                <div><i class="fa-solid fa-location-dot mr-1.5" style="color:${t.accent}"></i> ${formData.location || ''}</div>
+                            </div>
+                        </div>
+                    `;
+                    break;
+
+                case 'event':
+                    templateHTML = `
+                        <div style="width: 100%; height: 100%; background: ${t.gradientBg}; color: ${t.textPrimary}; padding: 26px; display: flex; flex-direction: column; justify-content: space-between; border-radius: 16px; border: 1px solid rgba(255,255,255,0.2); box-sizing: border-box; position: relative;">
+                            
+                            <div style="display: flex; justify-content: space-between; items-center;">
+                                <span style="font-size: 10px; font-weight: 800; letter-spacing: 3px; text-transform: uppercase; color: ${t.accent};">
+                                    INVITATION OFFICIELLE
+                                </span>
+                                <span style="font-size: 10px; font-family: monospace; background: rgba(255,255,255,0.1); padding: 2px 8px; border-radius: 4px;">
+                                    ${formData.passCode || 'PASS-00'}
+                                </span>
+                            </div>
+
+                            <div>
+                                <div style="font-size: 20px; font-weight: 800; tracking: -0.5px; padding-bottom: 2px;">
+                                    ${formData.eventTitle || 'Événement'}
+                                </div>
+                                <div style="font-size: 11px; color: ${t.textSecondary}; font-weight: 600;">
+                                    Organisé par : ${formData.host || 'Hôte'}
+                                </div>
+                            </div>
+
+                            <div style="border-top: 1px dashed rgba(255,255,255,0.2); padding-top: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 11px;">
+                                <div>
+                                    <div style="font-size: 9px; color: ${t.textSecondary}; uppercase">Quand ?</div>
+                                    <div style="font-weight: 700;">${formData.date || ''}</div>
+                                </div>
+                                <div>
+                                    <div style="font-size: 9px; color: ${t.textSecondary}; uppercase">Où ?</div>
+                                    <div style="font-weight: 700;">${formData.location || ''}</div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    break;
+
+                case 'vip':
+                    templateHTML = `
+                        <div style="width: 100%; height: 100%; background: ${t.gradientBg}; color: ${t.textPrimary}; padding: 24px; display: flex; flex-direction: column; justify-content: space-between; border-radius: 16px; border: 1px solid ${t.accent}; box-sizing: border-box; position: relative;">
+                            
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div style="font-size: 12px; font-weight: 800; tracking: 2px; color: ${t.accent}; display: flex; align-items: center; gap: 6px;">
+                                    <i class="fa-solid fa-crown text-amber-400"></i> ${formData.tier || 'VIP CLUB'}
+                                </div>
+                                <i class="fa-solid fa-microchip text-2xl" style="color: ${t.accent}; opacity: 0.8;"></i>
+                            </div>
+
+                            <div>
+                                <div style="font-size: 9px; text-transform: uppercase; color: ${t.textSecondary}; tracking: 1px;">Membre Privilège</div>
+                                <div style="font-size: 20px; font-weight: 800; letter-spacing: 0.5px; padding-top: 2px;">
+                                    ${formData.name || 'Nom du Membre'}
+                                </div>
+                            </div>
+
+                            <div style="display: flex; justify-content: space-between; align-items: flex-end; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px;">
+                                <div>
+                                    <div style="font-size: 8px; uppercase; color: ${t.textSecondary}">N° Identifiant</div>
+                                    <div style="font-family: monospace; font-size: 12px; font-weight: 700; color: ${t.accent};">${formData.memberNo || '0000'}</div>
+                                </div>
+                                <div style="text-align: right;">
+                                    <div style="font-size: 8px; uppercase; color: ${t.textSecondary}">VALIDE HORS EXPIRATION</div>
+                                    <div style="font-size: 11px; font-weight: 700;">${formData.validity || 'PERPÉTUEL'}</div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    break;
+            }
+
+            canvas.innerHTML = templateHTML;
+        }
+
+        async function captureCanvasHighRes() {
+            const cardElement = document.getElementById('cardCanvas');
+            showToast("Préparation de l'image...", "Calcul des polices et dimensions HD.");
+
+            // Wait for all custom Google fonts and icons to finish loading
+            if (document.fonts) {
+                await document.fonts.ready;
+            }
+
+            const cat = categories[currentCategory];
+            const isVertical = cat.vertical;
+
+            // Configure html2canvas capture options strictly
+            return await html2canvas(cardElement, {
+                scale: 3, // High-res capture
+                useCORS: true,
+                allowTaint: true,
+                backgroundColor: null,
+                logging: false,
+                width: isVertical ? 280 : 480,
+                height: isVertical ? 440 : 275
+            });
+        }
+
+        async function downloadPNG() {
+            try {
+                const canvas = await captureCanvasHighRes();
+                const link = document.createElement('a');
+                link.download = `CardCraft_${currentCategory}_${Date.now()}.png`;
+                link.href = canvas.toDataURL('image/png', 1.0);
+                link.click();
+                showToast("Téléchargement réussi !", "Votre fichier PNG HD est enregistré.");
+            } catch (e) {
+                console.error(e);
+                showToast("Erreur d'export", "Problème lors du rendu de la carte.");
+            }
+        }
+
+        async function downloadPDF() {
+            try {
+                const canvas = await captureCanvasHighRes();
+                const imgData = canvas.toDataURL('image/png', 1.0);
+                const cat = categories[currentCategory];
+
+                const { jsPDF } = window.jspdf;
+
+                let pdf;
+                if (cat.vertical) {
+                    // ID Badge portrait dimensions (54mm x 85.6mm)
+                    pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [54, 85.6] });
+                    pdf.addImage(imgData, 'PNG', 0, 0, 54, 85.6);
+                } else {
+                    // Standard Credit Card size landscape dimensions (85.6mm x 54mm)
+                    pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [85.6, 54] });
+                    pdf.addImage(imgData, 'PNG', 0, 0, 85.6, 54);
+                }
+
+                pdf.save(`CardCraft_${currentCategory}_${Date.now()}.pdf`);
+                showToast("PDF Généré", "Format d'impression standard prêt.");
+            } catch (e) {
+                console.error(e);
+                showToast("Erreur d'export", "Impossible de générer le PDF.");
+            }
+        }
+
+        function saveToGallery() {
+            const cardItem = {
+                id: Date.now(),
+                category: currentCategory,
+                theme: currentTheme,
+                imageSrc: currentImageSrc,
+                formData: { ...formData },
+                date: new Date().toLocaleDateString('fr-FR')
+            };
+
+            savedCards.unshift(cardItem);
+            localStorage.setItem('card_craft_saved_cards', JSON.stringify(savedCards));
+            renderSavedCards();
+            showToast("Sauvegardé !", "Carte ajoutée à votre Galerie.");
+        }
+
+        function loadCardFromGallery(savedObj) {
+            currentCategory = savedObj.category;
+            currentTheme = savedObj.theme;
+            currentImageSrc = savedObj.imageSrc || '';
+            formData = { ...savedObj.formData };
+
+            initCategoryPills();
+            initColorPicker();
+            
+            const cat = categories[currentCategory];
+            document.getElementById('categoryBadge').innerText = cat.label;
+            
+            if (currentImageSrc) {
+                document.getElementById('btnRemoveImage').classList.remove('hidden');
+            } else {
+                document.getElementById('btnRemoveImage').classList.add('hidden');
+            }
+
+            renderDynamicForm();
+            renderCard();
+            switchTab('studio');
+            showToast("Modèle chargé", "Prêt pour édition dans le studio.");
+        }
+
+        function deleteSavedCard(id, event) {
+            event.stopPropagation();
+            savedCards = savedCards.filter(c => c.id !== id);
+            localStorage.setItem('card_craft_saved_cards', JSON.stringify(savedCards));
+            renderSavedCards();
+            showToast("Supprimé", "Carte retirée de la galerie.");
+        }
+
+        function renderPresets() {
+            const container = document.getElementById('presetsGrid');
+            const presets = [
+                { category: 'pro', theme: 'indigo', title: 'Carte Executive Modern', desc: 'Idéale pour directeurs et consultants.' },
+                { category: 'badge', theme: 'cyan', title: 'Badge Sécurité Tech', desc: 'Format vertical pour événements et bureaux.' },
+                { category: 'birthday', theme: 'rose', title: 'Invitation Anniversaire VIP', desc: 'Élégante et festive pour grands événements.' },
+                { category: 'event', theme: 'emerald', title: 'Pass Gala Officiel', desc: 'Design épuré pour soirées d\'entreprise.' },
+                { category: 'vip', theme: 'darkgold', title: 'Carte Membre Gold', desc: 'Style luxueux avec finition dorée.' }
+            ];
+
+            container.innerHTML = presets.map((p, idx) => `
+                <div class="bg-slate-850 border border-slate-800 rounded-2xl p-5 hover:border-indigo-500/50 transition cursor-pointer flex flex-col justify-between group" onclick="applyPreset('${p.category}', '${p.theme}')">
+                    <div>
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-xs px-2.5 py-1 rounded-md bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-semibold">${categories[p.category].label}</span>
+                            <span class="w-3 h-3 rounded-full" style="background: ${colorThemes[p.theme].main}"></span>
+                        </div>
+                        <h4 class="text-base font-bold text-white group-hover:text-indigo-400 transition">${p.title}</h4>
+                        <p class="text-xs text-slate-400 mt-1">${p.desc}</p>
+                    </div>
+                    <div class="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs font-semibold text-indigo-400">
+                        <span>Ouvrir dans le studio</span>
+                        <i class="fa-solid fa-arrow-right transform group-hover:translate-x-1 transition"></i>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function applyPreset(catId, themeKey) {
+            currentCategory = catId;
+            currentTheme = themeKey;
+            loadCategoryData(catId);
+            setTheme(themeKey);
+            switchTab('studio');
+            showToast("Modèle Appliqué", "Personnalisez le texte selon vos besoins.");
+        }
+
+        function renderSavedCards() {
+            const container = document.getElementById('savedCardsGrid');
+            if (savedCards.length === 0) {
+                container.innerHTML = `
+                    <div class="col-span-full py-12 text-center text-slate-500">
+                        <i class="fa-solid fa-folder-open text-3xl mb-2"></i>
+                        <p class="text-sm">Aucune carte sauvegardée pour le moment.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = savedCards.map(c => `
+                <div class="bg-slate-850 border border-slate-800 rounded-2xl p-5 hover:border-slate-700 transition flex flex-col justify-between" onclick='loadCardFromGallery(${JSON.stringify(c)})'>
+                    <div>
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-xs font-bold text-slate-300 uppercase">${categories[c.category]?.label || 'Carte'}</span>
+                            <button onclick="deleteSavedCard(${c.id}, event)" class="text-slate-500 hover:text-rose-400 transition p-1">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </div>
+                        <h4 class="text-sm font-bold text-white">${c.formData.name || c.formData.eventTitle || 'Sans titre'}</h4>
+                        <p class="text-xs text-slate-400 mt-1">Créée le ${c.date}</p>
+                    </div>
+                    <div class="mt-4 pt-3 border-t border-slate-800 text-xs font-semibold text-indigo-400 flex items-center justify-between">
+                        <span>Charger dans le Studio</span>
+                        <i class="fa-solid fa-pen"></i>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        /* Toast Helper */
+        function showToast(title, msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastTitle').innerText = title;
+            document.getElementById('toastMessage').innerText = msg;
+
+            toast.classList.remove('translate-y-20', 'opacity-0');
+
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
