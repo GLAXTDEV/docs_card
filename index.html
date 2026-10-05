@@ -306,7 +306,10 @@
                     { id: 'company', label: 'Entreprise', type: 'text', default: 'NEXUS INNOVATION' },
                     { id: 'email', label: 'Email Pro', type: 'email', default: 's.laurent@nexus-innov.fr' },
                     { id: 'phone', label: 'Téléphone', type: 'text', default: '+33 6 45 78 90 12' },
-                    { id: 'web', label: 'Site Web / Adresse', type: 'text', default: 'www.nexus-innovation.fr' }
+                    { id: 'web', label: 'Site Web', type: 'text', default: 'www.nexus-innovation.fr' },
+                    { id: 'address', label: 'Adresse professionnelle', type: 'text', default: '12 rue de la Paix, 75002 Paris' },
+                    { id: 'linkedin', label: 'Profil LinkedIn', type: 'text', default: 'linkedin.com/in/sophielaurent' },
+                    { id: 'tagline', label: 'Signature / Slogan', type: 'text', default: 'Imaginer les idées de demain' }
                 ]
             },
             badge: {
@@ -368,13 +371,20 @@
             amber: { name: 'Ambre', main: '#d97706', gradientBg: 'linear-gradient(135deg, #451a03 0%, #78350f 100%)', textPrimary: '#ffffff', textSecondary: '#fcd34d', accent: '#f59e0b' },
             rose: { name: 'Rose', main: '#e11d48', gradientBg: 'linear-gradient(135deg, #4c0519 0%, #881337 100%)', textPrimary: '#ffffff', textSecondary: '#fda4af', accent: '#f43f5e' },
             cyan: { name: 'Cyan', main: '#0891b2', gradientBg: 'linear-gradient(135deg, #083344 0%, #164e63 100%)', textPrimary: '#ffffff', textSecondary: '#67e8f9', accent: '#06b6d4' },
-            darkgold: { name: 'Or Luxe', main: '#eab308', gradientBg: 'linear-gradient(135deg, #18181b 0%, #27272a 100%)', textPrimary: '#fef08a', textSecondary: '#d4d4d8', accent: '#eab308' }
+            darkgold: { name: 'Or Luxe', main: '#eab308', gradientBg: 'linear-gradient(135deg, #18181b 0%, #27272a 100%)', textPrimary: '#fef08a', textSecondary: '#d4d4d8', accent: '#eab308' },
+            sapphire: { name: 'Saphir', main: '#2563eb', gradientBg: 'linear-gradient(135deg, #101827 0%, #172554 55%, #1e3a8a 100%)', textPrimary: '#eff6ff', textSecondary: '#bfdbfe', accent: '#60a5fa' },
+            platinum: { name: 'Platine', main: '#cbd5e1', gradientBg: 'linear-gradient(135deg, #111827 0%, #334155 55%, #64748b 100%)', textPrimary: '#f8fafc', textSecondary: '#cbd5e1', accent: '#e2e8f0' },
+            copper: { name: 'Cuivre', main: '#c27849', gradientBg: 'linear-gradient(135deg, #211713 0%, #50301f 55%, #75452a 100%)', textPrimary: '#fff7ed', textSecondary: '#fed7aa', accent: '#d99a6c' },
+            pearl: { name: 'Perle', main: '#d6c8a8', gradientBg: 'linear-gradient(135deg, #fffdf7 0%, #f4efe3 100%)', textPrimary: '#292820', textSecondary: '#6b6658', accent: '#a18a55' }
         };
 
         let currentCategory = 'pro';
         let currentTheme = 'indigo';
+        let currentLayout = 'classic';
         let currentImageSrc = '';
         let formData = {};
+        let activeFieldIds = new Set();
+        let customFields = [];
 
         // Saved user cards
         let savedCards = JSON.parse(localStorage.getItem('card_craft_saved_cards') || '[]');
@@ -419,13 +429,14 @@
         function initColorPicker() {
             const container = document.getElementById('colorThemePicker');
             container.innerHTML = Object.entries(colorThemes).map(([key, t]) => `
-                <button onclick="setTheme('${key}')" id="theme-btn-${key}" class="w-8 h-8 rounded-full border-2 transition-transform transform hover:scale-110 flex items-center justify-center shadow" style="background: ${t.main}; border-color: ${key === currentTheme ? '#ffffff' : 'transparent'};" title="${t.name}">
+                <button onclick="setTheme('${key}')" id="theme-btn-${key}" class="w-8 h-8 rounded-full border-2 transition-transform transform hover:scale-110 flex items-center justify-center shadow" style="background: ${t.main}; border-color: ${key === currentTheme ? '#ffffff' : 'transparent'};" title="${t.name}" aria-label="Thème ${t.name}">
                 </button>
             `).join('');
         }
 
         function setCategory(catId) {
             currentCategory = catId;
+            currentLayout = 'classic';
             initCategoryPills();
             loadCategoryData(catId);
             showToast("Catégorie changée", `Modèle ${categories[catId].label} chargé.`);
@@ -446,6 +457,8 @@
             cat.fields.forEach(field => {
                 formData[field.id] = field.default;
             });
+            activeFieldIds = new Set(cat.fields.map(field => field.id));
+            customFields = [];
 
             // Update Dimensions label
             const dimensionsLabel = document.getElementById('dimensionsLabel');
@@ -465,13 +478,100 @@
         function renderDynamicForm() {
             const container = document.getElementById('dynamicFormFields');
             const cat = categories[currentCategory];
+            const inputClass = 'w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition';
+            const visibleFields = cat.fields.filter(field => activeFieldIds.has(field.id));
+            const removedFields = cat.fields.filter(field => !activeFieldIds.has(field.id));
 
-            container.innerHTML = cat.fields.map(f => `
-                <div>
-                    <label class="block text-xs font-semibold text-slate-400 uppercase mb-1.5">${f.label}</label>
-                    <input type="${f.type}" value="${formData[f.id] || ''}" oninput="updateFormField('${f.id}', this.value)" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition">
+            container.innerHTML = `
+                ${visibleFields.map(field => `
+                    <div class="flex items-end gap-2">
+                        <div class="flex-1 min-w-0">
+                            <label for="field-${field.id}" class="block text-xs font-semibold text-slate-400 uppercase mb-1.5">${field.label}</label>
+                            <input id="field-${field.id}" type="${field.type}" value="${escapeHTML(formData[field.id] || '')}" oninput="updateFormField('${field.id}', this.value)" class="${inputClass}">
+                        </div>
+                        <button type="button" onclick="removeCardField('${field.id}')" class="shrink-0 w-9 h-9 rounded-lg border border-slate-700 text-slate-400 hover:text-rose-400 hover:border-rose-500/50 transition" aria-label="Retirer ${field.label}" title="Retirer cet élément"><i class="fa-solid fa-trash-can"></i></button>
+                    </div>
+                `).join('')}
+                ${customFields.map(field => `
+                    <div class="flex items-end gap-2">
+                        <div class="flex-1 min-w-0 grid grid-cols-2 gap-2">
+                            <div>
+                                <label for="custom-label-${field.id}" class="block text-xs font-semibold text-slate-400 uppercase mb-1.5">Libellé</label>
+                                <input id="custom-label-${field.id}" type="text" value="${escapeHTML(field.label)}" oninput="updateCustomField('${field.id}', 'label', this.value)" class="${inputClass}">
+                            </div>
+                            <div>
+                                <label for="custom-value-${field.id}" class="block text-xs font-semibold text-slate-400 uppercase mb-1.5">Contenu</label>
+                                <input id="custom-value-${field.id}" type="text" value="${escapeHTML(field.value)}" oninput="updateCustomField('${field.id}', 'value', this.value)" class="${inputClass}">
+                            </div>
+                        </div>
+                        <button type="button" onclick="removeCustomField('${field.id}')" class="shrink-0 w-9 h-9 rounded-lg border border-slate-700 text-slate-400 hover:text-rose-400 hover:border-rose-500/50 transition" aria-label="Retirer ${escapeHTML(field.label || 'cet élément')}" title="Retirer cet élément"><i class="fa-solid fa-trash-can"></i></button>
+                    </div>
+                `).join('')}
+                ${removedFields.length ? `
+                    <div class="border-t border-slate-800 pt-3">
+                        <p class="text-[10px] font-bold text-slate-500 uppercase mb-2">Éléments retirés</p>
+                        <div class="flex flex-wrap gap-2">${removedFields.map(field => `<button type="button" onclick="restoreCardField('${field.id}')" class="px-2.5 py-1.5 rounded-lg border border-slate-700 text-xs text-slate-300 hover:border-emerald-500/50 hover:text-emerald-300 transition"><i class="fa-solid fa-plus mr-1"></i>${field.label}</button>`).join('')}</div>
+                    </div>
+                ` : ''}
+                <div class="border-t border-slate-800 pt-3">
+                    <p class="text-[10px] font-bold text-slate-500 uppercase mb-2">Ajouter un élément personnalisé</p>
+                    <div class="grid grid-cols-[1fr_1fr_auto] gap-2 items-end">
+                        <div>
+                            <label for="newFieldLabel" class="block text-xs font-semibold text-slate-400 mb-1.5">Libellé</label>
+                            <input id="newFieldLabel" type="text" placeholder="Ex. Service" class="${inputClass}">
+                        </div>
+                        <div>
+                            <label for="newFieldValue" class="block text-xs font-semibold text-slate-400 mb-1.5">Contenu</label>
+                            <input id="newFieldValue" type="text" placeholder="Ex. Conseil" class="${inputClass}">
+                        </div>
+                        <button type="button" onclick="addCustomField()" class="w-9 h-9 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition" aria-label="Ajouter cet élément" title="Ajouter cet élément"><i class="fa-solid fa-plus"></i></button>
+                    </div>
                 </div>
-            `).join('');
+            `;
+        }
+
+        function escapeHTML(value) {
+            return String(value).replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
+        }
+
+        function removeCardField(fieldId) {
+            activeFieldIds.delete(fieldId);
+            renderDynamicForm();
+            renderCard();
+        }
+
+        function restoreCardField(fieldId) {
+            activeFieldIds.add(fieldId);
+            renderDynamicForm();
+            renderCard();
+        }
+
+        function addCustomField() {
+            const labelInput = document.getElementById('newFieldLabel');
+            const valueInput = document.getElementById('newFieldValue');
+            const label = labelInput.value.trim();
+            if (!label) {
+                labelInput.focus();
+                return;
+            }
+
+            customFields.push({ id: `custom-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, label, value: valueInput.value.trim() });
+            renderDynamicForm();
+            renderCard();
+            document.getElementById('newFieldLabel').focus();
+        }
+
+        function updateCustomField(fieldId, key, value) {
+            const field = customFields.find(item => item.id === fieldId);
+            if (!field) return;
+            field[key] = value;
+            renderCard();
+        }
+
+        function removeCustomField(fieldId) {
+            customFields = customFields.filter(field => field.id !== fieldId);
+            renderDynamicForm();
+            renderCard();
         }
 
         function updateFormField(key, val) {
@@ -515,13 +615,65 @@
             // Render specific category design layout with explicit padding and vertical height fixes
             switch(currentCategory) {
                 case 'pro':
+                    if (currentLayout === 'split') {
+                        templateHTML = `
+                            <div style="width: 100%; height: 100%; background: ${t.gradientBg}; color: ${t.textPrimary}; display: grid; grid-template-columns: 38% 62%; border-radius: 16px; border: 1px solid rgba(255,255,255,0.15); box-sizing: border-box; overflow: hidden; position: relative;">
+                                <div style="padding: 20px; background: ${t.main}; display: flex; flex-direction: column; justify-content: space-between; z-index: 1;">
+                                    <div data-field="company" style="font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: ${t.textPrimary};">${formData.company || 'ENTREPRISE'}</div>
+                                    ${currentImageSrc ? `<img src="${currentImageSrc}" style="width: 64px; height: 64px; border-radius: 14px; object-fit: cover; border: 2px solid ${t.textPrimary};" crossorigin="anonymous"/>` : `<div style="width: 64px; height: 64px; border-radius: 14px; background: rgba(255,255,255,0.15); border: 1px dashed ${t.textPrimary}; display: flex; align-items: center; justify-content: center;"><i class="fa-solid fa-user text-2xl"></i></div>`}
+                                    <div>
+                                        <div data-field="name" style="font-size: 17px; font-weight: 800; line-height: 1.15;">${formData.name || 'Nom & Prénom'}</div>
+                                        <div data-field="title" style="font-size: 9px; font-weight: 700; text-transform: uppercase; margin-top: 5px; color: ${t.textPrimary};">${formData.title || 'Poste'}</div>
+                                    </div>
+                                </div>
+                                <div style="padding: 22px 20px; display: flex; flex-direction: column; justify-content: center; gap: 11px; z-index: 1;">
+                                    <div data-field="tagline" style="font-family: 'Cinzel', serif; font-size: 12px; color: ${t.textSecondary};">${formData.tagline || ''}</div>
+                                    <div style="height: 1px; background: rgba(255,255,255,0.18);"></div>
+                                    <div style="font-size: 9px; display: grid; gap: 8px;">
+                                        <div data-field="phone"><i class="fa-solid fa-phone" style="color:${t.accent}; width: 15px;"></i> ${formData.phone || ''}</div>
+                                        <div data-field="email"><i class="fa-solid fa-envelope" style="color:${t.accent}; width: 15px;"></i> ${formData.email || ''}</div>
+                                        <div data-field="web"><i class="fa-solid fa-globe" style="color:${t.accent}; width: 15px;"></i> ${formData.web || ''}</div>
+                                        <div data-field="linkedin"><i class="fa-brands fa-linkedin" style="color:${t.accent}; width: 15px;"></i> ${formData.linkedin || ''}</div>
+                                        <div data-field="address"><i class="fa-solid fa-location-dot" style="color:${t.accent}; width: 15px;"></i> ${formData.address || ''}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        break;
+                    }
+
+                    if (currentLayout === 'signature') {
+                        templateHTML = `
+                            <div style="width: 100%; height: 100%; background: ${t.gradientBg}; color: ${t.textPrimary}; padding: 23px 26px; display: flex; flex-direction: column; justify-content: space-between; border-radius: 16px; border: 1px solid ${t.accent}; box-sizing: border-box; overflow: hidden; position: relative;">
+                                <div style="position: absolute; top: 0; left: 0; width: 100%; height: 5px; background: ${t.accent};"></div>
+                                <div style="display: flex; align-items: center; gap: 12px; z-index: 1;">
+                                    ${currentImageSrc ? `<img src="${currentImageSrc}" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid ${t.accent};" crossorigin="anonymous"/>` : `<div style="width: 48px; height: 48px; border-radius: 50%; border: 1px solid ${t.accent}; display: flex; align-items: center; justify-content: center; color: ${t.accent};"><i class="fa-solid fa-user"></i></div>`}
+                                    <div>
+                                        <div data-field="company" style="font-size: 9px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; color: ${t.textSecondary};">${formData.company || 'ENTREPRISE'}</div>
+                                        <div data-field="name" style="font-size: 23px; font-weight: 700; font-family: 'Cinzel', serif; margin-top: 2px;">${formData.name || 'Nom & Prénom'}</div>
+                                        <div data-field="title" style="font-size: 10px; color: ${t.textSecondary};">${formData.title || 'Poste'}</div>
+                                    </div>
+                                </div>
+                                <div data-field="tagline" style="font-size: 11px; font-style: italic; color: ${t.textSecondary}; padding-left: 60px;">${formData.tagline || ''}</div>
+                                <div data-card-contact-list style="display: grid; grid-template-columns: 1fr 1fr; gap: 7px 12px; font-size: 9px; border-top: 1px solid rgba(255,255,255,0.18); padding-top: 10px; z-index: 1;">
+                                    <div data-field="phone"><i class="fa-solid fa-phone" style="color:${t.accent}; width: 14px;"></i> ${formData.phone || ''}</div>
+                                    <div data-field="email"><i class="fa-solid fa-envelope" style="color:${t.accent}; width: 14px;"></i> ${formData.email || ''}</div>
+                                    <div data-field="web"><i class="fa-solid fa-globe" style="color:${t.accent}; width: 14px;"></i> ${formData.web || ''}</div>
+                                    <div data-field="linkedin"><i class="fa-brands fa-linkedin" style="color:${t.accent}; width: 14px;"></i> ${formData.linkedin || ''}</div>
+                                    <div data-field="address" style="grid-column: span 2;"><i class="fa-solid fa-location-dot" style="color:${t.accent}; width: 14px;"></i> ${formData.address || ''}</div>
+                                </div>
+                            </div>
+                        `;
+                        break;
+                    }
+
                     templateHTML = `
                         <div style="width: 100%; height: 100%; background: ${t.gradientBg}; color: ${t.textPrimary}; padding: 24px; display: flex; flex-direction: column; justify-content: space-between; border-radius: 16px; border: 1px solid rgba(255,255,255,0.1); box-sizing: border-box; overflow: hidden; position: relative;">
                             
                             <!-- Header -->
                             <div style="display: flex; justify-content: space-between; align-items: flex-start; z-index: 2;">
                                 <div>
-                                    <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; tracking: 2px; color: ${t.textSecondary}; padding-bottom: 2px;">
+                                    <div data-field="company" style="font-size: 11px; font-weight: 800; text-transform: uppercase; tracking: 2px; color: ${t.textSecondary}; padding-bottom: 2px;">
                                         ${formData.company || 'ENTREPRISE'}
                                     </div>
                                 </div>
@@ -530,32 +682,43 @@
 
                             <!-- Body -->
                             <div style="z-index: 2; padding-top: 4px; padding-bottom: 4px;">
-                                <div style="font-size: 22px; font-weight: 800; color: ${t.textPrimary}; padding-bottom: 2px; line-height: 1.2;">
+                                <div data-field="name" style="font-size: 22px; font-weight: 800; color: ${t.textPrimary}; padding-bottom: 2px; line-height: 1.2;">
                                     ${formData.name || 'Nom & Prénom'}
                                 </div>
-                                <div style="font-size: 12px; font-weight: 600; color: ${t.textSecondary}; text-transform: uppercase; letter-spacing: 1px;">
+                                <div data-field="title" style="font-size: 12px; font-weight: 600; color: ${t.textSecondary}; text-transform: uppercase; letter-spacing: 1px;">
                                     ${formData.title || 'Poste'}
+                                </div>
+                                <div data-field="tagline" style="font-size: 10px; font-style: italic; color: ${t.textSecondary}; margin-top: 4px;">
+                                    ${formData.tagline || ''}
                                 </div>
                             </div>
 
                             <!-- Footer Grid -->
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 10.5px; color: ${t.textPrimary}; z-index: 2; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.15);">
-                                <div style="display: flex; align-items: center; gap: 6px;">
+                            <div data-card-contact-list style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px 8px; font-size: 9px; color: ${t.textPrimary}; z-index: 2; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.15);">
+                                <div data-field="phone" style="display: flex; align-items: center; gap: 6px;">
                                     <span style="color: ${t.accent};"><i class="fa-solid fa-phone"></i></span>
                                     <span>${formData.phone || ''}</span>
                                 </div>
-                                <div style="display: flex; align-items: center; gap: 6px;">
+                                <div data-field="email" style="display: flex; align-items: center; gap: 6px;">
                                     <span style="color: ${t.accent};"><i class="fa-solid fa-envelope"></i></span>
                                     <span>${formData.email || ''}</span>
                                 </div>
-                                <div style="display: flex; align-items: center; gap: 6px; grid-column: span 2;">
+                                <div data-field="web" style="display: flex; align-items: center; gap: 6px; grid-column: span 2;">
                                     <span style="color: ${t.accent};"><i class="fa-solid fa-globe"></i></span>
                                     <span>${formData.web || ''}</span>
+                                </div>
+                                <div data-field="linkedin" style="display: flex; align-items: center; gap: 6px;">
+                                    <span style="color: ${t.accent};"><i class="fa-brands fa-linkedin"></i></span>
+                                    <span>${formData.linkedin || ''}</span>
+                                </div>
+                                <div data-field="address" style="display: flex; align-items: center; gap: 6px;">
+                                    <span style="color: ${t.accent};"><i class="fa-solid fa-location-dot"></i></span>
+                                    <span>${formData.address || ''}</span>
                                 </div>
                             </div>
 
                             <!-- Background Accent Shape -->
-                            <div style="position: absolute; right: -40px; bottom: -40px; width: 160px; height: 160px; border-radius: 50%; background: ${t.main}; opacity: 0.15; pointer-events: none;"></div>
+                            <div data-card-accent style="position: absolute; right: -40px; bottom: -40px; width: 160px; height: 160px; border-radius: 50%; background: ${t.main}; opacity: 0.15; pointer-events: none;"></div>
                         </div>
                     `;
                     break;
@@ -581,15 +744,15 @@
 
                             <!-- Name & Role -->
                             <div>
-                                <div style="font-size: 18px; font-weight: 800; color: ${t.textPrimary}; padding-bottom: 2px;">${formData.name || 'Nom'}</div>
-                                <div style="font-size: 12px; font-weight: 600; color: ${t.textSecondary};">${formData.role || 'Role'}</div>
+                                    <div data-field="name" style="font-size: 18px; font-weight: 800; color: ${t.textPrimary}; padding-bottom: 2px;">${formData.name || 'Nom'}</div>
+                                    <div data-field="role" style="font-size: 12px; font-weight: 600; color: ${t.textSecondary};">${formData.role || 'Role'}</div>
                             </div>
 
                             <!-- Info Box -->
                             <div style="width: 100%; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 10px; font-size: 10px; text-align: left; display: grid; grid-template-cols: 1fr 1fr; gap: 4px;">
-                                <div><span style="color:${t.textSecondary}">DÉPT:</span> ${formData.dept || '—'}</div>
-                                <div><span style="color:${t.textSecondary}">EXP:</span> ${formData.expiry || '—'}</div>
-                                <div style="grid-column: span 2; font-family: monospace; letter-spacing: 1px; margin-top: 4px; color:${t.accent}; font-weight: 700;">
+                                <div data-field="dept"><span style="color:${t.textSecondary}">DÉPT:</span> ${formData.dept || '—'}</div>
+                                <div data-field="expiry"><span style="color:${t.textSecondary}">EXP:</span> ${formData.expiry || '—'}</div>
+                                <div data-field="matricule" style="grid-column: span 2; font-family: monospace; letter-spacing: 1px; margin-top: 4px; color:${t.accent}; font-weight: 700;">
                                     ${formData.matricule || 'ID-0000'}
                                 </div>
                             </div>
@@ -608,24 +771,24 @@
                                 <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; color: ${t.textSecondary};">
                                     <i class="fa-solid fa-cake-candles mr-1"></i> CELEBRATION
                                 </div>
-                                <div style="font-size: 16px; font-weight: 800; background: ${t.accent}; color: #fff; padding: 2px 10px; border-radius: 20px;">
+                                <div data-field="age" style="font-size: 16px; font-weight: 800; background: ${t.accent}; color: #fff; padding: 2px 10px; border-radius: 20px;">
                                     ${formData.age || '30 Ans'}
                                 </div>
                             </div>
 
                             <div style="padding: 8px 0;">
                                 <div style="font-size: 10px; text-transform: uppercase; color: ${t.textSecondary}; font-weight: 700;">Invitation spéciale pour</div>
-                                <div style="font-size: 26px; font-weight: 800; color: ${t.textPrimary}; font-family: 'Cinzel', serif;">
+                                <div data-field="name" style="font-size: 26px; font-weight: 800; color: ${t.textPrimary}; font-family: 'Cinzel', serif;">
                                     ${formData.name || 'Prénom'}
                                 </div>
-                                <div style="font-size: 11px; font-style: italic; color: ${t.textSecondary}; margin-top: 4px;">
+                                <div data-field="message" style="font-size: 11px; font-style: italic; color: ${t.textSecondary}; margin-top: 4px;">
                                     "${formData.message || ''}"
                                 </div>
                             </div>
 
                             <div style="background: rgba(255,255,255,0.08); padding: 10px 14px; border-radius: 12px; font-size: 11px; display: flex; justify-content: space-between; align-items: center;">
-                                <div><i class="fa-regular fa-calendar-check mr-1.5" style="color:${t.accent}"></i> ${formData.date || ''}</div>
-                                <div><i class="fa-solid fa-location-dot mr-1.5" style="color:${t.accent}"></i> ${formData.location || ''}</div>
+                                <div data-field="date"><i class="fa-regular fa-calendar-check mr-1.5" style="color:${t.accent}"></i> ${formData.date || ''}</div>
+                                <div data-field="location"><i class="fa-solid fa-location-dot mr-1.5" style="color:${t.accent}"></i> ${formData.location || ''}</div>
                             </div>
                         </div>
                     `;
@@ -639,26 +802,26 @@
                                 <span style="font-size: 10px; font-weight: 800; letter-spacing: 3px; text-transform: uppercase; color: ${t.accent};">
                                     INVITATION OFFICIELLE
                                 </span>
-                                <span style="font-size: 10px; font-family: monospace; background: rgba(255,255,255,0.1); padding: 2px 8px; border-radius: 4px;">
+                                <span data-field="passCode" style="font-size: 10px; font-family: monospace; background: rgba(255,255,255,0.1); padding: 2px 8px; border-radius: 4px;">
                                     ${formData.passCode || 'PASS-00'}
                                 </span>
                             </div>
 
                             <div>
-                                <div style="font-size: 20px; font-weight: 800; tracking: -0.5px; padding-bottom: 2px;">
+                                <div data-field="eventTitle" style="font-size: 20px; font-weight: 800; tracking: -0.5px; padding-bottom: 2px;">
                                     ${formData.eventTitle || 'Événement'}
                                 </div>
-                                <div style="font-size: 11px; color: ${t.textSecondary}; font-weight: 600;">
+                                <div data-field="host" style="font-size: 11px; color: ${t.textSecondary}; font-weight: 600;">
                                     Organisé par : ${formData.host || 'Hôte'}
                                 </div>
                             </div>
 
                             <div style="border-top: 1px dashed rgba(255,255,255,0.2); padding-top: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 11px;">
-                                <div>
+                                <div data-field="date">
                                     <div style="font-size: 9px; color: ${t.textSecondary}; uppercase">Quand ?</div>
                                     <div style="font-weight: 700;">${formData.date || ''}</div>
                                 </div>
-                                <div>
+                                <div data-field="location">
                                     <div style="font-size: 9px; color: ${t.textSecondary}; uppercase">Où ?</div>
                                     <div style="font-weight: 700;">${formData.location || ''}</div>
                                 </div>
@@ -672,7 +835,7 @@
                         <div style="width: 100%; height: 100%; background: ${t.gradientBg}; color: ${t.textPrimary}; padding: 24px; display: flex; flex-direction: column; justify-content: space-between; border-radius: 16px; border: 1px solid ${t.accent}; box-sizing: border-box; position: relative;">
                             
                             <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <div style="font-size: 12px; font-weight: 800; tracking: 2px; color: ${t.accent}; display: flex; align-items: center; gap: 6px;">
+                                <div data-field="tier" style="font-size: 12px; font-weight: 800; tracking: 2px; color: ${t.accent}; display: flex; align-items: center; gap: 6px;">
                                     <i class="fa-solid fa-crown text-amber-400"></i> ${formData.tier || 'VIP CLUB'}
                                 </div>
                                 <i class="fa-solid fa-microchip text-2xl" style="color: ${t.accent}; opacity: 0.8;"></i>
@@ -680,17 +843,17 @@
 
                             <div>
                                 <div style="font-size: 9px; text-transform: uppercase; color: ${t.textSecondary}; tracking: 1px;">Membre Privilège</div>
-                                <div style="font-size: 20px; font-weight: 800; letter-spacing: 0.5px; padding-top: 2px;">
+                                <div data-field="name" style="font-size: 20px; font-weight: 800; letter-spacing: 0.5px; padding-top: 2px;">
                                     ${formData.name || 'Nom du Membre'}
                                 </div>
                             </div>
 
                             <div style="display: flex; justify-content: space-between; align-items: flex-end; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px;">
-                                <div>
+                                <div data-field="memberNo">
                                     <div style="font-size: 8px; uppercase; color: ${t.textSecondary}">N° Identifiant</div>
                                     <div style="font-family: monospace; font-size: 12px; font-weight: 700; color: ${t.accent};">${formData.memberNo || '0000'}</div>
                                 </div>
-                                <div style="text-align: right;">
+                                <div data-field="validity" style="text-align: right;">
                                     <div style="font-size: 8px; uppercase; color: ${t.textSecondary}">VALIDE HORS EXPIRATION</div>
                                     <div style="font-size: 11px; font-weight: 700;">${formData.validity || 'PERPÉTUEL'}</div>
                                 </div>
@@ -701,6 +864,31 @@
             }
 
             canvas.innerHTML = templateHTML;
+            canvas.querySelectorAll('[data-field]').forEach(element => {
+                if (!activeFieldIds.has(element.dataset.field)) element.remove();
+            });
+
+            if (customFields.length) {
+                const customBlock = document.createElement('div');
+                customBlock.style.cssText = 'display: grid; gap: 3px; margin-top: 5px; padding: 5px 7px; border-radius: 7px; background: rgba(0,0,0,0.18); font-size: 8px; line-height: 1.25;';
+                customFields.forEach(field => {
+                    const row = document.createElement('div');
+                    const label = document.createElement('strong');
+                    label.textContent = `${field.label}: `;
+                    label.style.color = t.textSecondary;
+                    row.append(label, document.createTextNode(field.value));
+                    customBlock.appendChild(row);
+                });
+
+                const cardRoot = canvas.firstElementChild;
+                let host = cardRoot;
+                if (currentCategory === 'pro' && currentLayout === 'split') host = cardRoot.children[1];
+                let anchor = host.lastElementChild;
+                if (currentCategory === 'pro' && currentLayout === 'classic') anchor = cardRoot.querySelector('[data-card-accent]');
+                if (currentCategory === 'pro' && currentLayout === 'signature') anchor = cardRoot.querySelector('[data-card-contact-list]');
+                if (anchor) host.insertBefore(customBlock, anchor);
+                else host.appendChild(customBlock);
+            }
         }
 
         async function captureCanvasHighRes() {
@@ -773,6 +961,9 @@
                 id: Date.now(),
                 category: currentCategory,
                 theme: currentTheme,
+                layout: currentLayout,
+                visibleFields: [...activeFieldIds],
+                customFields: customFields.map(field => ({ ...field })),
                 imageSrc: currentImageSrc,
                 formData: { ...formData },
                 date: new Date().toLocaleDateString('fr-FR')
@@ -787,8 +978,11 @@
         function loadCardFromGallery(savedObj) {
             currentCategory = savedObj.category;
             currentTheme = savedObj.theme;
+            currentLayout = savedObj.layout || 'classic';
             currentImageSrc = savedObj.imageSrc || '';
             formData = { ...savedObj.formData };
+            activeFieldIds = new Set(savedObj.visibleFields || Object.keys(formData));
+            customFields = (savedObj.customFields || []).map(field => ({ ...field }));
 
             initCategoryPills();
             initColorPicker();
@@ -820,14 +1014,19 @@
             const container = document.getElementById('presetsGrid');
             const presets = [
                 { category: 'pro', theme: 'indigo', title: 'Carte Executive Modern', desc: 'Idéale pour directeurs et consultants.' },
+                { category: 'pro', theme: 'sapphire', layout: 'split', title: 'Carte Signature Saphir', desc: 'Composition asymétrique, contacts détaillés et bleu profond.' },
+                { category: 'pro', theme: 'pearl', layout: 'signature', title: 'Carte Signature Perle', desc: 'Finition claire et typographie élégante.' },
+                { category: 'pro', theme: 'copper', layout: 'signature', title: 'Carte Héritage Cuivre', desc: 'Accents métalliques et mise en page raffinée.' },
                 { category: 'badge', theme: 'cyan', title: 'Badge Sécurité Tech', desc: 'Format vertical pour événements et bureaux.' },
                 { category: 'birthday', theme: 'rose', title: 'Invitation Anniversaire VIP', desc: 'Élégante et festive pour grands événements.' },
                 { category: 'event', theme: 'emerald', title: 'Pass Gala Officiel', desc: 'Design épuré pour soirées d\'entreprise.' },
-                { category: 'vip', theme: 'darkgold', title: 'Carte Membre Gold', desc: 'Style luxueux avec finition dorée.' }
+                { category: 'event', theme: 'platinum', title: 'Pass Platine', desc: 'Invitation contemporaine aux reflets argentés.' },
+                { category: 'vip', theme: 'darkgold', title: 'Carte Membre Gold', desc: 'Style luxueux avec finition dorée.' },
+                { category: 'vip', theme: 'platinum', title: 'Carte Club Platine', desc: 'Carte membre sobre aux tons platine.' }
             ];
 
             container.innerHTML = presets.map((p, idx) => `
-                <div class="bg-slate-850 border border-slate-800 rounded-2xl p-5 hover:border-indigo-500/50 transition cursor-pointer flex flex-col justify-between group" onclick="applyPreset('${p.category}', '${p.theme}')">
+                <div class="bg-slate-850 border border-slate-800 rounded-2xl p-5 hover:border-indigo-500/50 transition cursor-pointer flex flex-col justify-between group" onclick="applyPreset('${p.category}', '${p.theme}', '${p.layout || 'classic'}')">
                     <div>
                         <div class="flex items-center justify-between mb-3">
                             <span class="text-xs px-2.5 py-1 rounded-md bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-semibold">${categories[p.category].label}</span>
@@ -844,9 +1043,10 @@
             `).join('');
         }
 
-        function applyPreset(catId, themeKey) {
+        function applyPreset(catId, themeKey, layout) {
             currentCategory = catId;
             currentTheme = themeKey;
+            currentLayout = layout;
             loadCategoryData(catId);
             setTheme(themeKey);
             switchTab('studio');
